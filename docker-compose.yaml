@@ -1,0 +1,91 @@
+version: '3.9'
+services:
+  mysql-user-db:
+    image: mysql:8.0
+    container_name: user-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: userdb
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3307:3306"
+    networks:
+      - usernet
+    volumes:
+      - mysql_user_data:/var/lib/mysql
+  
+  mysql-product-db:
+    image: mysql:8.0
+    container_name: product-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: productdb
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3308:3306"
+    networks:
+      - usernet
+    volumes:
+      - mysql_product_data:/var/lib/mysql
+  
+  mysql-order-db:
+    image: mysql:8.0
+    container_name: order-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: orderdb
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3309:3306"
+    networks:
+      - usernet
+    volumes:
+      - mysql_order_data:/var/lib/mysql
+
+  user-service:
+    build: ./user-service
+    container_name: user-service
+    depends_on:
+      - mysql-user-db
+    ports:
+      - "8081:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    networks:
+      - usernet
+  
+  product-service:
+    build: ./product-service
+    container_name: product-service
+    depends_on:
+      - mysql-product-db
+    ports:
+      - "8082:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    networks:
+      - usernet
+
+  order-service:
+    build: ./order-service
+    container_name: order-service
+    depends_on:
+      - mysql-order-db
+    ports:
+      - "8083:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    networks:
+      - usernet
+
+volumes:
+  mysql_user_data:
+  mysql_product_data:
+  mysql_order_data:
+
+networks:
+  usernet:
+    driver: bridge
