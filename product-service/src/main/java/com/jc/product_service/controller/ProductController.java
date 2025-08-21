@@ -1,18 +1,46 @@
 package com.jc.product_service.controller;
 
+import com.jc.product_service.model.Product;
+import com.jc.product_service.service.ProductService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
+@RequestMapping("/products")
 public class ProductController {
 
-    @GetMapping("/products/{id}")
-    public ResponseEntity<String> getProduct(@PathVariable String id) {
-        return ResponseEntity.ok("Product details for ID: " + id);
+    private final ProductService productService;
+
+    public ProductController(ProductService productService) {
+        this.productService = productService;
     }
 
-    @PostMapping("/products")
-    public ResponseEntity<String> createProduct(@RequestBody String product) {
-        return ResponseEntity.ok("Product created: " + product);
+    @PostMapping
+    public ResponseEntity<Product> createProduct(@Valid @RequestBody Product product) {
+        return ResponseEntity.ok(productService.createProduct(product));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Product>> getAllProducts() {
+        return ResponseEntity.ok(productService.getAllProducts());
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Product> getProductById(@PathVariable Long id) {
+        return ResponseEntity.ok(productService.getProductById(id));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Product> updateProduct(@PathVariable Long id, @Valid @RequestBody Product product) {
+        return ResponseEntity.ok(productService.updateProduct(id, product));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
+        productService.deleteProduct(id);
+        return ResponseEntity.noContent().build();
     }
 }
