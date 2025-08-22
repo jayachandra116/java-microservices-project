@@ -2,6 +2,8 @@ package com.jc.order_service.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jc.order_service.entity.OrderStatus;
+import com.jc.order_service.exception.InsufficientStockException;
+import com.jc.order_service.exception.OrderNotFoundException;
 import com.jc.order_service.model.Order;
 import com.jc.order_service.service.OrderService;
 import org.junit.jupiter.api.Test;
@@ -12,13 +14,13 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(OrderController.class)
 public class OrderControllerTest {
@@ -36,8 +38,8 @@ public class OrderControllerTest {
     void shouldCreateOrder() throws Exception {
         Order order = Order.builder()
                 .id(1L)
-                .userId(1L)
-                .productId(2L)
+                .userId(2L)
+                .productId(3L)
                 .quantity(3)
                 .status(OrderStatus.PENDING)
                 .build();
@@ -48,6 +50,41 @@ public class OrderControllerTest {
                         .content(objectMapper.writeValueAsString(order)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1));
+    }
+
+    @Test
+    void shouldReturn404WhenOrderNotFound() throws Exception {
+        when(orderService.getOrderById(1L)).thenThrow(new OrderNotFoundException(1L));
+
+        mockMvc.perform(get("/orders/1"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Order with ID: 1 not found"));
+    }
+
+    @Test
+    void shouldReturn400WhenInsufficientStock() throws Exception {
+        when(orderService.createOrder(Mockito.any(Order.class)))
+                .thenThrow(new InsufficientStockException(10L, 5, 2));
+
+        mockMvc.perform(post("/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":1,\"productId\":10,\"quantity\":5}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Insufficient stock for product ID: 10. Requested: 5, Available: 2"));
+    }
+
+    @Test
+    void shouldDecrementStockWhenOrderIsCreated() throws Exception {
+        Order order = new Order(1L, 1L, 10L, 2, OrderStatus.PENDING, LocalDateTime.now(), LocalDateTime.now());
+
+        when(orderService.createOrder(any(Order.class))).thenReturn(order);
+
+        mockMvc.perform(post("/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":1,\"productId\":10,\"quantity\":2}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.productId").value(10))
+                .andExpect(jsonPath("$.quantity").value(2));
     }
 
     @Test

@@ -38,6 +38,17 @@ public class ProductController {
         return ResponseEntity.ok(productService.updateProduct(id, product));
     }
 
+    @PostMapping("/{id}/decrement-stock")
+    public ResponseEntity<String> decrementStock(@PathVariable Long id, @RequestParam int quantity) {
+        Product product = productService.getProductById(id);
+        if (product.getStock() < quantity) {
+            return ResponseEntity.badRequest().body("Insufficient stock for product ID: " + id);
+        }
+        product.setStock(product.getStock() - quantity);
+        productService.updateProduct(product.getId(), product);
+        return ResponseEntity.ok("Stock updated successfully");
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);

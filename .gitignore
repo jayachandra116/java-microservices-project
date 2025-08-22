@@ -1,1 +1,9 @@
 .vscode/
+target/
+*.iml
+.idea/
+*.log
+*.class
+*.jar
+*.war
+*.db
