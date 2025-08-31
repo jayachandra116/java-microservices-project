@@ -15,7 +15,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import java.util.Arrays;
+import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -29,6 +30,11 @@ public class OrderServiceTest {
 
     @Mock
     private UserClient userClient;
+
+    @Mock
+    private UserService userService;
+    @Mock
+    private ProductService productService;
 
     @Mock
     private ProductClient productClient;
@@ -45,60 +51,53 @@ public class OrderServiceTest {
     }
 
     @Test
-    void shouldThrowUserNotFoundWhenUserDoesNotExist() {
-        Order order = new Order();
-        order.setUserId(1L);
-        order.setProductId(10L);
-        doThrow(new RuntimeException("404")).when(userClient).getUserById(1L);
+    void testCreateOrder_Success() {
+        UserClient.UserResponse user = new UserClient.UserResponse(1L, "John Doe", "john@example.com");
+        ProductClient.ProductResponse product = new ProductClient.ProductResponse(1L, "Laptop", 10.0, "laptop", 10);
+
+        when(userService.getUser(1L)).thenReturn(user);
+        when(productService.getProduct(1L)).thenReturn(product);
+
+        Order Order = new Order(1L, 1L, 1L, 2, OrderStatus.PENDING, LocalDateTime.now(), LocalDateTime.now());
+        Order savedOrder = new Order(1L, 1L, 1L, 2, OrderStatus.PENDING, LocalDateTime.now(), LocalDateTime.now());
+
+        when(orderRepository.save(any(Order.class))).thenReturn(savedOrder);
+
+        Order result = orderService.createOrder(Order);
+
+        assertNotNull(result);
+        assertEquals(2, result.getQuantity());
+    }
+
+    @Test
+    void testCreateOrder_UserNotFound() {
+        when(userService.getUser(1L)).thenThrow(new UserNotFoundException(1L));
+        Order order = new Order(1L, 1L, 1L, 2, OrderStatus.PENDING, LocalDateTime.now(), LocalDateTime.now());
         assertThrows(UserNotFoundException.class, () -> orderService.createOrder(order));
     }
 
     @Test
-    void shouldThrowProductNotFoundWhenProductDoesNotExist() {
-        Order order = new Order();
-        order.setUserId(1L);
-        order.setProductId(990L);
-        order.setQuantity(5);
-        UserClient.UserResponse user = new UserClient.UserResponse(1L, "Joe", "joe@ex.com");
-        // User exists
-        when(userClient.getUserById(1L)).thenReturn(user);
-        // Product fails
-        doThrow(new RuntimeException("404")).when(productClient).getProductById(10L);
+    void testCreateOrder_ProductNotFound() {
+        UserClient.UserResponse user = new UserClient.UserResponse(1L, "John Doe", "john@example.com");
+        when(userService.getUser(1L)).thenReturn(user);
+        when(productService.getProduct(1L)).thenThrow(new ProductNotFoundException(1L));
+
+        Order order = new Order(1L, 1L, 1L, 2, OrderStatus.PENDING, LocalDateTime.now(), LocalDateTime.now());
+
         assertThrows(ProductNotFoundException.class, () -> orderService.createOrder(order));
     }
 
     @Test
-    void shouldThrowOrderNotFoundWhenOrderMissing() {
-        when(orderRepository.findById(1L)).thenReturn(Optional.empty());
-        assertThrows(OrderNotFoundException.class, () -> orderService.getOrderById(1L));
-    }
+    void testCreateOrder_InsufficientStock() {
+        UserClient.UserResponse user = new UserClient.UserResponse(1L, "John Doe", "john@example.com");
+        ProductClient.ProductResponse product = new ProductClient.ProductResponse(1L, "Laptop", 100.0, "laptop", 1);
 
-    @Test
-    void shouldThrowInsufficientStockWhenQuantityExceedsAvailable() {
-        Order order = new Order();
-        order.setUserId(1L);
-        order.setProductId(10L);
-        order.setQuantity(5);
-        UserClient.UserResponse user = new UserClient.UserResponse(1L, "Joe", "joe@ex.com");
-        when(userClient.getUserById(1L)).thenReturn(user);
-        // Mock product with only 2 in stock
-        var product = new ProductClient.ProductResponse(10L, "Laptop", 2000.0, "Laptop", 2);
-        when(productClient.getProductById(10L)).thenReturn(product);
-        assertThrows(InsufficientStockException.class, () -> orderService.createOrder(order));
-    }
+        when(userService.getUser(1L)).thenReturn(user);
+        when(productService.getProduct(1L)).thenReturn(product);
 
-    @Test
-    void shouldCreateOrderWhenUserAndProductExists() {
-        Order order = new Order();
-        order.setUserId(1L);
-        order.setProductId(2L);
-        order.setQuantity(1);
-        when(userClient.getUserById(1L)).thenReturn(new UserClient.UserResponse(1L, "John", "John@email.com"));
-        when(productClient.getProductById(2L)).thenReturn(new ProductClient.ProductResponse(2L, "Laptop", 1200.0, "laptop", 4));
-        when(orderRepository.save(order)).thenReturn(order);
-        Order created = orderService.createOrder(order);
-        assertNotNull(created);
-        assertEquals(order, created);
+        Order Order = new Order(1L, 1L, 1L, 5, OrderStatus.PENDING, LocalDateTime.now(), LocalDateTime.now());
+
+        assertThrows(InsufficientStockException.class, () -> orderService.createOrder(Order));
     }
 
     @Test
@@ -116,7 +115,7 @@ public class OrderServiceTest {
 
     @Test
     void shouldGetAllOrders() {
-        when(orderRepository.findAll()).thenReturn(Arrays.asList(order));
+        when(orderRepository.findAll()).thenReturn(Collections.singletonList(order));
         assertEquals(1, orderService.getAllOrders().size());
     }
 

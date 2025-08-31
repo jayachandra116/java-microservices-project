@@ -1,7 +1,5 @@
 package com.jc.order_service.service;
 
-import com.jc.order_service.client.ProductClient;
-import com.jc.order_service.client.UserClient;
 import com.jc.order_service.exception.InsufficientStockException;
 import com.jc.order_service.exception.OrderNotFoundException;
 import com.jc.order_service.exception.ProductNotFoundException;
@@ -16,25 +14,25 @@ import java.util.List;
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
-    private final UserClient userClient;
-    private final ProductClient productClient;
+    private final UserService userService;
+    private final ProductService productService;
 
-    public OrderServiceImpl(OrderRepository orderRepository, UserClient userClient, ProductClient productClient) {
+    public OrderServiceImpl(OrderRepository orderRepository, UserService userService, ProductService productService) {
         this.orderRepository = orderRepository;
-        this.userClient = userClient;
-        this.productClient = productClient;
+        this.userService = userService;
+        this.productService = productService;
     }
+
 
     @Override
     public Order createOrder(Order order) {
 
-        try {
-            userClient.getUserById(order.getUserId());
-        } catch (Exception e) {
+        var user = userService.getUser(order.getUserId());
+        var product = productService.getProduct(order.getProductId());
+
+        if (user == null) {
             throw new UserNotFoundException(order.getUserId());
         }
-
-        var product = productClient.getProductById(order.getProductId());
         if (product == null) {
             throw new ProductNotFoundException(order.getProductId());
         }
@@ -44,12 +42,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         Order savedOrder = orderRepository.save(order);
-
-        try {
-            productClient.decrementStock(product.id(), order.getQuantity());
-        } catch (Exception e) {
-            System.out.println("Failed to decrement stock for productId " + order.getProductId() + ": " + e.getMessage());
-        }
+        productService.decrementStock(product.id(), order.getQuantity());
         return savedOrder;
     }
 

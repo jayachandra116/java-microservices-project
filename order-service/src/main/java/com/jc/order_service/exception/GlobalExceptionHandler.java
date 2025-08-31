@@ -1,5 +1,6 @@
 package com.jc.order_service.exception;
 
+import com.jc.order_service.dto.ErrorResponse;
 import feign.FeignException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -8,62 +9,56 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Collections;
+import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String error, List<String> details) {
+        ErrorResponse response = new ErrorResponse(LocalDateTime.now(), status.value(), error, details);
+        return new ResponseEntity<>(response, status);
+    }
+
     @ExceptionHandler(OrderNotFoundException.class)
-    public ResponseEntity<Map<String, String>> handleNotFound(OrderNotFoundException ex) {
-        Map<String, String> error = new HashMap<>();
-        error.put("timestamp", String.valueOf(LocalDateTime.now()));
-        error.put("error", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    public ResponseEntity<ErrorResponse> handleOrderNotFound(OrderNotFoundException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, "Order not found", Collections.singletonList(ex.getMessage()));
     }
 
     @ExceptionHandler(ProductNotFoundException.class)
-    public ResponseEntity<Map<String, String>> handleProductNotFound(ProductNotFoundException ex) {
-        Map<String, String> error = new HashMap<>();
-        error.put("timestamp", String.valueOf(LocalDateTime.now()));
-        error.put("error", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    public ResponseEntity<ErrorResponse> handleProductNotFound(ProductNotFoundException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, "Product not found", Collections.singletonList(ex.getMessage()));
     }
 
     @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<Map<String, String>> handleUserNotFound(UserNotFoundException ex) {
-        Map<String, String> error = new HashMap<>();
-        error.put("timestamp", String.valueOf(LocalDateTime.now()));
-        error.put("error", ex.getMessage());
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
-    }
-
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException ex) {
-        Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getFieldErrors().forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
-        return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(FeignException.NotFound.class)
-    public ResponseEntity<String> handleFeignNotFound(FeignException.NotFound ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, "User not found", Collections.singletonList(ex.getMessage()));
     }
 
     @ExceptionHandler(InsufficientStockException.class)
-    public ResponseEntity<String> handleInsufficientStock(InsufficientStockException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+    public ResponseEntity<ErrorResponse> handleInsufficientStock(InsufficientStockException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, "Insufficient stock", Collections.singletonList(ex.getMessage()));
     }
 
+    @ExceptionHandler(ExternalServiceException.class)
+    public ResponseEntity<ErrorResponse> handleExternalService(ExternalServiceException ex) {
+        return buildResponse(HttpStatus.BAD_GATEWAY, "External service error", Collections.singletonList(ex.getMessage()));
+    }
+
+    @ExceptionHandler(FeignException.NotFound.class)
+    public ResponseEntity<ErrorResponse> handleFeignNotFound(FeignException.NotFound ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), List.of("External service not found"));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
+        List<String> errors = ex.getBindingResult().getFieldErrors().stream().map(error -> error.getField() + ": " + error.getDefaultMessage()).toList();
+        return buildResponse(HttpStatus.BAD_REQUEST, "Validation failed", errors);
+    }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", LocalDateTime.now());
-        body.put("error", "Internal Server Error");
-        body.put("message", ex.getMessage());
-        return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
+    public ResponseEntity<ErrorResponse> handleGeneric(Exception ex) {
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", List.of(ex.getMessage()));
     }
 
 }
