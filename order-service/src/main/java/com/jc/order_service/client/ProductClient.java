@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-@FeignClient(name = "product-service", url = "${PRODUCT_SERVICE_URL:http://localhost:8082}")
+@FeignClient(name = "product-service")
 public interface ProductClient {
 
     record ProductResponse(Long id, String name, Double price, String description, Integer stock) {

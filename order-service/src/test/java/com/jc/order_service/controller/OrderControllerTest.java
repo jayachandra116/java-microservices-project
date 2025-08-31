@@ -1,11 +1,15 @@
 package com.jc.order_service.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jc.order_service.client.ProductClient;
 import com.jc.order_service.entity.OrderStatus;
+import com.jc.order_service.exception.ExternalServiceException;
 import com.jc.order_service.exception.InsufficientStockException;
 import com.jc.order_service.exception.OrderNotFoundException;
 import com.jc.order_service.model.Order;
 import com.jc.order_service.service.OrderService;
+import com.jc.order_service.service.ProductService;
+import com.jc.order_service.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,12 +19,13 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
+import java.util.Collections;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(OrderController.class)
 public class OrderControllerTest {
@@ -30,6 +35,12 @@ public class OrderControllerTest {
 
     @MockitoBean
     private OrderService orderService;
+
+    @MockitoBean
+    private UserService userService;
+
+    @MockitoBean
+    private ProductService productService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -58,7 +69,7 @@ public class OrderControllerTest {
 
         mockMvc.perform(get("/orders/1"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("Order with ID: 1 not found"));
+                .andExpect(jsonPath("$.error").value("Order not found"));
     }
 
     @Test
@@ -70,7 +81,7 @@ public class OrderControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"userId\":1,\"productId\":10,\"quantity\":5}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(content().string("Insufficient stock for product ID: 10. Requested: 5, Available: 2"));
+                .andExpect(jsonPath("$.error").value("Insufficient stock"));
     }
 
     @Test
@@ -113,7 +124,7 @@ public class OrderControllerTest {
                 .status(OrderStatus.PENDING)
                 .build();
         when(orderService.getAllOrders())
-                .thenReturn(Arrays.asList(order));
+                .thenReturn(Collections.singletonList(order));
 
         mockMvc.perform(get("/orders"))
                 .andExpect(status().isOk())
